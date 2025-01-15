@@ -11,7 +11,7 @@ export const CONFIG = {
     },
     // Model's voice
     VOICE: {
-        NAME: 'Aoede' // You can choose one from: Puck, Charon, Kore, Fenrir, Aoede (Kore and Aoede are female voices, rest are male)
+        NAME: 'Kore' // You can choose one from: Puck, Charon, Kore, Fenrir, Aoede (Kore and Aoede are female voices, rest are male)
     },
     // Default audio settings
     AUDIO: {
