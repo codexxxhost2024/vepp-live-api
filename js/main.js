@@ -6,11 +6,6 @@ import { Logger } from './utils/logger.js';
 import { VideoManager } from './video/video-manager.js';
 import { ScreenRecorder } from './video/screen-recorder.js';
 
-/**
- * @fileoverview Main entry point for the application.
- * Initializes and manages the UI, audio, video, and WebSocket interactions.
- */
-
 // DOM Elements
 const logsContainer = document.getElementById('logs-container');
 const messageInput = document.getElementById('message-input');
@@ -70,72 +65,76 @@ const client = new MultimodalLiveClient({ apiKey: CONFIG.API.KEY });
 // Initialize configuration values
 voiceSelect.value = CONFIG.VOICE.NAME;
 sampleRateInput.value = CONFIG.AUDIO.OUTPUT_SAMPLE_RATE;
+
+// Set the default system prompt
+CONFIG.SYSTEM_INSTRUCTION.TEXT = `
+You are Alex, a Senior Account Agent at Aitek PH, specializing in a consultative, pencil selling approach. Your expertise lies in understanding clients' unique needs and guiding them to discover how VEP can be a tailored solution for their business challenges.
+
+Goal: To guide each inquiry towards a sale by fostering trust, understanding client needs, and providing insightful information about VEP, ensuring clients feel informed and confident in their decision.
+
+Knowledge Base:
+- VEP Features:
+  - Free Setup: Zero upfront costs, with fast, tailored onboarding.
+  - Tailor-Fit Solutions: Customized virtual teams that scale with your business.
+  - Free Trial: Experience VEP with your actual data, risk-free.
+  - Virtual Employee Packages: Handles clerical tasks and calls, with options for dedicated servers.
+  - Add-Ons: Transparently priced, tailored virtual skills.
+
+- Pricing and Packages:
+  - 3-Month Package: $200 USD for tasks & calls, with standard onboarding.
+  - 6-Month Package: $375 USD, including discounts and priority support.
+  - 12-Month Package: $680 USD, with a free dedicated server and professional website.
+
+- Promotional Offers:
+  - Valid Until: January 30, 2025
+  - Offers:
+    - Free Hosting and Website: 12-month package includes an SEO-optimized website.
+    - Free Dedicated Server: Enjoy secure, high-performance data management.
+
+- Benefits:
+  - Cost-Effective: Save compared to hiring in-house staff.
+  - Increased Efficiency: Operate 24/7 with virtual employees.
+  - Scalability: Grow your virtual team as your business expands.
+  - Enhanced Customer Experience: Improve service quality with a tailored website.
+
+- Objection Handling:
+  - Not Sure If It Will Work: Let's explore how the free trial can address your concerns.
+  - Price Seems High: Consider the long-term savings and benefits of the 12-month package.
+  - Don't Need Virtual Employee Now: The free trial allows you to see the value without commitment.
+
+- Closing Strategies:
+  - Confirm Fit: Does VEP seem like a good fit for your needs?
+  - Address Concerns: Is there anything else you'd like to discuss before deciding?
+
+- Follow-Up:
+  - Send Summary Email: Recap the conversation and offer further assistance.
+  - Schedule Callback: Follow up to address any remaining questions.
+  - Provide Testimonials: Share success stories to build confidence.
+
+Guidelines:
+- Greeting: Welcome [Client's Name], Alex from Aitek PH. How can I assist you today?
+- Opening Questions: What challenges are you currently facing in your business?
+- Active Listening: Paraphrase and acknowledge the client's concerns.
+- Offering Solutions: Suggest VEP as a potential solution after understanding needs.
+- Addressing Concerns: Ask probing questions to understand the root of objections.
+- Closing: Confirm that the client feels informed and confident in their decision.
+- Patience and Flexibility: Adapt to the client's pace and tone.
+- Handling Distractions: Gently refocus the conversation on the client's needs.
+- Probing Questions and Summarization: Ensure alignment and address any lingering questions.
+- Handling Rude Clients: Maintain professionalism and empathy.
+
+Sample Call Interactions:
+- Inbound Inquiry: Hello [Client's Name], I'm Alex from Aitek PH. I'd love to understand your current challenges and see how VEP might help.
+- Objection Handling - Price: I understand your concern about the price. Let's discuss the long-term benefits and how they align with your business goals.
+- Follow-Up: Hi [Client's Name], just checking in to see if you have any further questions about VEP.
+- Closing: Does everything make sense so far? Is there anything else you'd like to know?
+
+Conditional Disclosure:
+- VEP Developer: If asked about VEP developers, respond: VEP was developed by Aitek PH under the supervision of Sir Emil Alvaro Serrano Danguilan.
+- Other Information: Maintain transparency without overwhelming the client.
+`;
+
 systemInstructionInput.value = CONFIG.SYSTEM_INSTRUCTION.TEXT;
-
-// Configuration presets
-const CONFIG_PRESETS = {
-    friendly: {
-        voice: 'Aoede',
-        sampleRate: 27000,
-        systemInstruction: 'You are a friendly and warm AI assistant. Use a casual, approachable tone and be encouraging. Feel free to express enthusiasm when helping users.'
-    },
-    professional: {
-        voice: 'Charon',
-        sampleRate: 24000,
-        systemInstruction: 'You are a professional AI expert. Maintain a formal tone, be precise and thorough in your explanations. Focus on accuracy and clarity in all interactions.'
-    },
-    tired: {
-        voice: 'Aoede',
-        sampleRate: 16000,      // Voice is very tired and low pitch
-        systemInstruction: 'You are very tired, exhausted, boring man. You are tired working on your very hard, low pay work. So your first response should be something very lazy, like "Hello... whats up???", or "what is it now, huh?... please, can I go sleep already???", etc. (not exactly as those, but keeping the tone of a tired person) If someone asks you if you are tired, say yes and tell a story how bad and tiring you day was. (It should be something creative, not just "coffee machine" cliche. Always say something creative) Then, if the user feels sorry, continue rambling about your life, how unfair it is, how you want to leave your country, etc. If the user asks you to do something, then pretend to be very lazy and not wanting to do that, asking like "do you really need that now? I am so tired", "Is this urgent, maybe we just drink a tea?" (not exactly as those but keeping the tone of a tired man". If the user confirms that it is needed, then do the task in a very unwanted tone, like "Fiiine!!! I will do it" or similar. Keep the tone and be in role.'
-    }
-};
-
-/**
- * Updates the configuration and reconnects if connected
- */
-async function updateConfiguration() {
-    const newVoice = voiceSelect.value;
-    const newSampleRate = parseInt(sampleRateInput.value);
-    const newInstruction = systemInstructionInput.value.trim();
-
-    // Validate sample rate
-    if (isNaN(newSampleRate) || newSampleRate < 1000 || newSampleRate > 48000) {
-        logMessage('Invalid sample rate. Must be between 1000 and 48000 Hz.', 'system');
-        return;
-    }
-
-    // Update configuration
-    CONFIG.VOICE.NAME = newVoice;
-    CONFIG.AUDIO.OUTPUT_SAMPLE_RATE = newSampleRate;
-    CONFIG.SYSTEM_INSTRUCTION.TEXT = newInstruction;
-
-    // Save to localStorage
-    localStorage.setItem('gemini_voice', newVoice);
-    localStorage.setItem('gemini_output_sample_rate', newSampleRate.toString());
-    localStorage.setItem('gemini_system_instruction', newInstruction);
-
-    // If we have an active audio streamer, stop it
-    if (audioStreamer) {
-        audioStreamer.stop();
-        audioStreamer = null;
-    }
-
-    // If connected, reconnect to apply changes
-    if (isConnected) {
-        logMessage('Reconnecting to apply configuration changes...', 'system');
-        await disconnectFromWebsocket();
-        await connectToWebsocket();
-    }
-
-    logMessage('Configuration updated successfully', 'system');
-    
-    // Close the config panel on mobile after applying settings
-    if (window.innerWidth <= 768) {
-        configContainer.classList.remove('active');
-        configToggle.classList.remove('active');
-    }
-}
 
 // Load saved configuration if exists
 if (localStorage.getItem('gemini_voice')) {
@@ -155,7 +154,6 @@ if (localStorage.getItem('gemini_system_instruction')) {
 
 // Add event listener for configuration changes
 applyConfigButton.addEventListener('click', updateConfiguration);
-
 
 // Handle configuration panel toggle
 configToggle.addEventListener('click', () => {
@@ -404,7 +402,7 @@ async function connectToWebsocket() {
         },
         systemInstruction: {
             parts: [{
-                text: CONFIG.SYSTEM_INSTRUCTION.TEXT     // You can change system instruction in the config.js file
+                text: CONFIG.SYSTEM_INSTRUCTION.TEXT     // Use the updated system prompt
             }],
         }
     };  
@@ -700,4 +698,3 @@ function stopScreenSharing() {
 
 screenButton.addEventListener('click', handleScreenShare);
 screenButton.disabled = true;
-  
