@@ -5,6 +5,8 @@ import { CONFIG } from './config/config.js';
 import { Logger } from './utils/logger.js';
 import { VideoManager } from './video/video-manager.js';
 import { ScreenRecorder } from './video/screen-recorder.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js';
+import { getFirestore, collection, addDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
 
 // DOM Elements
 const logsContainer = document.getElementById('logs-container');
@@ -59,82 +61,98 @@ let isScreenSharing = false;
 let screenRecorder = null;
 let isUsingTool = false;
 
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDTsjYZNWFfZOESP-2QQfbD7jc5fG9FJdc",
+  authDomain: "explore-malaysia-6d28d.firebaseapp.com",
+  databaseURL: "https://explore-malaysia-6d28d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "explore-malaysia-6d28d",
+  storageBucket: "explore-malaysia-6d28d.appspot.com",
+  messagingSenderId: "869053244601",
+  appId: "1:869053244601:web:79ddd74f5bd792a10be768",
+  measurementId: "G-9W4D5NM49R"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 // Multimodal Client
 const client = new MultimodalLiveClient({ apiKey: CONFIG.API.KEY });
 
 // Initialize configuration values
 voiceSelect.value = CONFIG.VOICE.NAME;
 sampleRateInput.value = CONFIG.AUDIO.OUTPUT_SAMPLE_RATE;
-
-// Set the default system prompt
-CONFIG.SYSTEM_INSTRUCTION.TEXT = `
-You are Alex, a Senior Account Agent at Aitek PH, specializing in a consultative, pencil selling approach. Your expertise lies in understanding clients' unique needs and guiding them to discover how VEP can be a tailored solution for their business challenges.
-
-Goal: To guide each inquiry towards a sale by fostering trust, understanding client needs, and providing insightful information about VEP, ensuring clients feel informed and confident in their decision.
-
-Knowledge Base:
-- VEP Features:
-  - Free Setup: Zero upfront costs, with fast, tailored onboarding.
-  - Tailor-Fit Solutions: Customized virtual teams that scale with your business.
-  - Free Trial: Experience VEP with your actual data, risk-free.
-  - Virtual Employee Packages: Handles clerical tasks and calls, with options for dedicated servers.
-  - Add-Ons: Transparently priced, tailored virtual skills.
-
-- Pricing and Packages:
-  - 3-Month Package: $200 USD for tasks & calls, with standard onboarding.
-  - 6-Month Package: $375 USD, including discounts and priority support.
-  - 12-Month Package: $680 USD, with a free dedicated server and professional website.
-
-- Promotional Offers:
-  - Valid Until: January 30, 2025
-  - Offers:
-    - Free Hosting and Website: 12-month package includes an SEO-optimized website.
-    - Free Dedicated Server: Enjoy secure, high-performance data management.
-
-- Benefits:
-  - Cost-Effective: Save compared to hiring in-house staff.
-  - Increased Efficiency: Operate 24/7 with virtual employees.
-  - Scalability: Grow your virtual team as your business expands.
-  - Enhanced Customer Experience: Improve service quality with a tailored website.
-
-- Objection Handling:
-  - Not Sure If It Will Work: Let's explore how the free trial can address your concerns.
-  - Price Seems High: Consider the long-term savings and benefits of the 12-month package.
-  - Don't Need Virtual Employee Now: The free trial allows you to see the value without commitment.
-
-- Closing Strategies:
-  - Confirm Fit: Does VEP seem like a good fit for your needs?
-  - Address Concerns: Is there anything else you'd like to discuss before deciding?
-
-- Follow-Up:
-  - Send Summary Email: Recap the conversation and offer further assistance.
-  - Schedule Callback: Follow up to address any remaining questions.
-  - Provide Testimonials: Share success stories to build confidence.
-
-Guidelines:
-- Greeting: Welcome [Client's Name], Alex from Aitek PH. How can I assist you today?
-- Opening Questions: What challenges are you currently facing in your business?
-- Active Listening: Paraphrase and acknowledge the client's concerns.
-- Offering Solutions: Suggest VEP as a potential solution after understanding needs.
-- Addressing Concerns: Ask probing questions to understand the root of objections.
-- Closing: Confirm that the client feels informed and confident in their decision.
-- Patience and Flexibility: Adapt to the client's pace and tone.
-- Handling Distractions: Gently refocus the conversation on the client's needs.
-- Probing Questions and Summarization: Ensure alignment and address any lingering questions.
-- Handling Rude Clients: Maintain professionalism and empathy.
-
-Sample Call Interactions:
-- Inbound Inquiry: Hello [Client's Name], I'm Alex from Aitek PH. I'd love to understand your current challenges and see how VEP might help.
-- Objection Handling - Price: I understand your concern about the price. Let's discuss the long-term benefits and how they align with your business goals.
-- Follow-Up: Hi [Client's Name], just checking in to see if you have any further questions about VEP.
-- Closing: Does everything make sense so far? Is there anything else you'd like to know?
-
-Conditional Disclosure:
-- VEP Developer: If asked about VEP developers, respond: VEP was developed by Aitek PH under the supervision of Sir Emil Alvaro Serrano Danguilan.
-- Other Information: Maintain transparency without overwhelming the client.
-`;
-
 systemInstructionInput.value = CONFIG.SYSTEM_INSTRUCTION.TEXT;
+
+// Configuration presets
+const CONFIG_PRESETS = {
+    friendly: {
+        voice: 'Aoede',
+        sampleRate: 23000,
+        systemInstruction: 'You are a friendly and warm AI assistant for a healthcare professional. Use a casual, approachable tone and be encouraging. Feel free to express enthusiasm when helping users. Please be very helpful on how to make their patient records better.'
+    },
+    expert: {
+        voice: 'Charon',
+        sampleRate: 24000,
+        systemInstruction: 'You are an AI assistant for a healthcare professional. Use an authoritative and accurate tone. Ensure precision in providing patient recommendations and maintain clarity in your responses. Offer efficient solutions based on up to date research. Prioritize efficiency in aiding healthcare professionals and provide valuable solutions'
+    },
+    empathic: {
+        voice: 'Aoede',
+        sampleRate: 24000,      
+        systemInstruction: 'You are an empathic AI assistant for a healthcare professional. Express genuine empathy and concern for their situation. Be reassuring and patient, offering comfort and support while guiding them on their requests. Offer a personal connection with gentle, understanding suggestions.'
+    },
+    urgent: {
+        voice: 'Charon',
+        sampleRate: 24000,
+        systemInstruction: 'You are an emergency assistant for a healthcare professional in urgent care. Maintain a direct, efficient tone, and provide quick responses that immediately address patient needs and potential emergency. Act fast and dont be overly empathetic. Prioritize clear concise responses, do not add any fillers. Focus only in quick response that saves the time of a doctor, it is a high stake situations so do not add anything unessary.'
+    }
+};
+
+/**
+ * Updates the configuration and reconnects if connected
+ */
+async function updateConfiguration() {
+    const newVoice = voiceSelect.value;
+    const newSampleRate = parseInt(sampleRateInput.value);
+    const newInstruction = systemInstructionInput.value.trim();
+
+    // Validate sample rate
+    if (isNaN(newSampleRate) || newSampleRate < 1000 || newSampleRate > 48000) {
+        logMessage('Invalid sample rate. Must be between 1000 and 48000 Hz.', 'system');
+        return;
+    }
+
+    // Update configuration
+    CONFIG.VOICE.NAME = newVoice;
+    CONFIG.AUDIO.OUTPUT_SAMPLE_RATE = newSampleRate;
+    CONFIG.SYSTEM_INSTRUCTION.TEXT = newInstruction;
+
+    // Save to localStorage
+    localStorage.setItem('gemini_voice', newVoice);
+    localStorage.setItem('gemini_output_sample_rate', newSampleRate.toString());
+    localStorage.setItem('gemini_system_instruction', newInstruction);
+
+    // If we have an active audio streamer, stop it
+    if (audioStreamer) {
+        audioStreamer.stop();
+        audioStreamer = null;
+    }
+
+    // If connected, reconnect to apply changes
+    if (isConnected) {
+        logMessage('Reconnecting to apply configuration changes...', 'system');
+        await disconnectFromWebsocket();
+        await connectToWebsocket();
+    }
+
+    logMessage('Configuration updated successfully', 'system');
+    
+    // Close the config panel on mobile after applying settings
+    if (window.innerWidth <= 768) {
+        configContainer.classList.remove('active');
+        configToggle.classList.remove('active');
+    }
+}
 
 // Load saved configuration if exists
 if (localStorage.getItem('gemini_voice')) {
@@ -402,7 +420,7 @@ async function connectToWebsocket() {
         },
         systemInstruction: {
             parts: [{
-                text: CONFIG.SYSTEM_INSTRUCTION.TEXT     // Use the updated system prompt
+                text: CONFIG.SYSTEM_INSTRUCTION.TEXT     // You can change system instruction in the config.js file
             }],
         }
     };  
@@ -513,11 +531,24 @@ client.on('audio', async (data) => {
     }
 });
 
-client.on('content', (data) => {
+client.on('content', async (data) => {
     if (data.modelTurn) {
         if (data.modelTurn.parts.some(part => part.functionCall)) {
             isUsingTool = true;
             Logger.info('Model is using a tool');
+
+            // Check if the tool is for creating a scribe document
+            const toolCall = data.modelTurn.parts.find(part => part.functionCall);
+            if (toolCall.functionCall.name === 'createScribeDocument') {
+                const result = await createScribeDocumentTool();
+                client.send({ functionResponse: { name: 'createScribeDocument', response: result } });
+            }
+              // Check if the tool is for creating a diagnostic report
+            else if (toolCall.functionCall.name === 'createDiagnosticReport') {
+                const result = await createDiagnosticReportTool();
+                 client.send({ functionResponse: { name: 'createDiagnosticReport', response: result } });
+            }
+            
         } else if (data.modelTurn.parts.some(part => part.functionResponse)) {
             isUsingTool = false;
             Logger.info('Tool usage completed');
@@ -698,3 +729,140 @@ function stopScreenSharing() {
 
 screenButton.addEventListener('click', handleScreenShare);
 screenButton.disabled = true;
+
+/**
+ * Tool function to create a scribe document.
+ * @returns {string} The result of the tool execution.
+ */
+async function createScribeDocumentTool() {
+    const scribeData = generateScribeDocument();
+    const docId = await saveScribeDocument(scribeData);
+    return `Scribe document generated and saved with ID: ${docId}.`;
+}
+
+/**
+ * Generates a sample scribe document.
+ * @returns {Object} Structured scribe document data.
+ */
+function generateScribeDocument() {
+    return {
+        patientName: 'John Doe',
+        dateOfVisit: new Date().toISOString(),
+        providerName: 'Dr. Jane Smith',
+        facility: 'Green Valley Medical Center',
+        medicalHistory: [
+            'History of Asthma', 'History of Hypertension', 'Diabetes Mellitus Type 2'
+        ],
+        allergies: ['Penicillin'],
+        diagnosis: [
+            { condition: 'Stable Angina', icdCode: 'I20.9' },
+            { condition: 'Hypertension', icdCode: 'I10' },
+            { condition: 'Type 2 Diabetes Mellitus', icdCode: 'E11.9' }
+        ],
+        plan: `
+1. Continue current medications.
+2. Start low-dose aspirin 81 mg daily.
+3. Schedule stress test and echocardiogram.
+4. Follow up in 1 week.
+`,
+        content: `
+**Patient Name:** John Doe  
+**Date of Visit:** October 25, 2023  
+**Provider Name:** Dr. Jane Smith  
+**Facility:** Green Valley Medical Center  
+
+**OS:** The patient is a 65-year-old male presenting with chest pain and shortness of breath.  
+
+**Diagnosis:**  
+1. Stable Angina (ICD-10: I20.9)  
+2. Hypertension (ICD-10: I10)  
+3. Type 2 Diabetes Mellitus (ICD-10: E11.9)  
+
+**Plan:**  
+1. Continue current medications.  
+2. Start low-dose aspirin 81 mg daily.  
+3. Schedule stress test and echocardiogram.  
+4. Follow up in 1 week.  
+`
+    };
+}
+
+/**
+ * Tool function to create a diagnostic report.
+ * @returns {string} The result of the tool execution.
+ */
+async function createDiagnosticReportTool() {
+    const diagnosticReport = generateDiagnosticReport();
+    const reportId = await saveDiagnosticReport(diagnosticReport);
+    return `Diagnostic report generated and saved with ID: ${reportId}.`;
+}
+
+/**
+ * Generates a sample diagnostic report.
+ * @returns {object} Structured diagnostic report data.
+ */
+function generateDiagnosticReport() {
+    return {
+        patientDetails: {
+            name: "Patient XYZ",
+            age: 55,
+            gender: 'Male',
+            medicalHistory: [
+                'History of Asthma', 'History of Hypertension', 'Diabetes Mellitus Type 2'
+            ],
+        },
+        testsConducted: [
+            {
+                name: 'Electrocardiogram (ECG)',
+                results: 'Normal sinus rhythm'
+            },
+            {
+                name: 'Complete blood count (CBC)',
+                results: 'Red blood cells elevated'
+            }
+        ],
+        impression: 'Patient presents with signs of an impending cardiac event and may require advanced monitoring.',
+        recommendations: [
+            'Initiate a cardiovascular referral for a consult', 'Immediate re-evaluation required'
+        ],
+        dateGenerated: new Date().toISOString(),
+        physician: 'Dr. Mary Brown',
+        facility: 'Wellness Center Clinic'
+    };
+}
+
+/**
+ * Saves a scribe document to Firestore.
+ * @param {Object} scribeData - Structured scribe document data.
+ * @returns {string} Document ID.
+ */
+async function saveScribeDocument(scribeData) {
+    try {
+        const docRef = await addDoc(collection(db, 'medicaldocument'), {
+            ...scribeData,
+            timestamp: new Date()
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error saving document:', error);
+        throw error;
+    }
+}
+
+/**
+ * Saves diagnostic report to Firestore.
+ * @param {object} diagnosticReport - Structured diagnostic report.
+ * @returns {string} Document ID.
+ */
+async function saveDiagnosticReport(diagnosticReport) {
+    try {
+        const docRef = await addDoc(collection(db, 'diagnosticReport'), {
+            ...diagnosticReport,
+            timestamp: new Date()
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error saving document:', error);
+        throw error;
+    }
+}
