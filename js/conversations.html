@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversation History</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <style>
+        /* Theme variables */
+        :root[data-theme="dark"] {
+            --primary-color: #4285f4;
+            --secondary-color: #34a853;
+            --danger-color: #ea4335;
+            --background-color: #1a1a1a;
+            --surface-color: #2d2d2d;
+            --border-color: #404040;
+            --text-color: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --border-radius: 8px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        :root[data-theme="light"] {
+            --primary-color: #4285f4;
+            --secondary-color: #34a853;
+            --danger-color: #ea4335;
+            --background-color: #f0f0f0;
+            --surface-color: #fff;
+            --border-color: #ccc;
+            --text-color: #333;
+            --text-secondary: #666;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        /* Set dark theme as default */
+        :root {
+            color-scheme: dark;
+        }
+
+        :root:not([data-theme]) {
+            color-scheme: dark;
+            --primary-color: #4285f4;
+            --secondary-color: #34a853;
+            --danger-color: #ea4335;
+            --background-color: #1a1a1a;
+            --surface-color: #2d2d2d;
+            --border-color: #404040;
+            --text-color: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --border-radius: 8px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        /* Layout */
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--spacing-md);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .conversation-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .conversation-item {
+            background: var(--surface-color);
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px var(--shadow-color);
+        }
+
+        .conversation-item h3 {
+            margin-bottom: var(--spacing-sm);
+            color: var(--primary-color);
+        }
+
+        .conversation-item p {
+            color: var(--text-secondary);
+        }
+
+        .timestamp {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .back-button {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border: none;
+            border-radius: var(--border-radius);
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <button class="back-button" onclick="window.location.href='index.html'">
+            <span class="material-symbols-outlined">arrow_back</span> Back to Chat
+        </button>
+        <h1>Conversation History</h1>
+        <div class="conversation-list" id="conversation-list">
+            <!-- Conversation items will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js';
+        import { getFirestore, collection, query, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTsjYZNWFfZOESP-2QQfbD7jc5fG9FJdc",
+            authDomain: "explore-malaysia-6d28d.firebaseapp.com",
+            databaseURL: "https://explore-malaysia-6d28d-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "explore-malaysia-6d28d",
+            storageBucket: "explore-malaysia-6d28d.appspot.com",
+            messagingSenderId: "869053244601",
+            appId: "1:869053244601:web:79ddd74f5bd792a10be768",
+            measurementId: "G-9W4D5NM49R"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Fetch and display conversation history
+        async function loadConversationHistory() {
+            const conversationList = document.getElementById('conversation-list');
+            conversationList.innerHTML = '<p>Loading conversations...</p>';
+
+            try {
+                const q = query(collection(db, 'conversations'), orderBy('timestamp', 'desc'));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    conversationList.innerHTML = '<p>No conversations found.</p>';
+                    return;
+                }
+
+                conversationList.innerHTML = ''; // Clear loading message
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const conversationItem = document.createElement('div');
+                    conversationItem.classList.add('conversation-item');
+
+                    const timestamp = new Date(data.timestamp?.toDate()).toLocaleString();
+                    conversationItem.innerHTML = `
+                        <h3>${data.user}</h3>
+                        <p>${data.message}</p>
+                        <p class="timestamp">${timestamp}</p>
+                    `;
+
+                    conversationList.appendChild(conversationItem);
+                });
+            } catch (error) {
+                console.error('Error loading conversation history:', error);
+                conversationList.innerHTML = '<p>Failed to load conversations. Please try again later.</p>';
+            }
+        }
+
+        // Load conversation history when the page loads
+        window.addEventListener('load', loadConversationHistory);
+    </script>
+</body>
+</html>
